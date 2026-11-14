@@ -1,4 +1,4 @@
-#environmental test
+#platform handler
 import pygame
 
 class Platform:

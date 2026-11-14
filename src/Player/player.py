@@ -40,6 +40,9 @@ class Player:
         self.is_grounded = True
         self.total_jumps = 2
 
+        #platform detection
+        self.current_platform = None
+
         #Player stats
         self.health = 100
         self.max_health = 100
@@ -60,6 +63,28 @@ class Player:
 
     def move_z(self, dt):
         self.z += self.z_velocity*dt
+
+    def wall_restricted_movements(self, delta_time, walls):
+
+        #attempt X
+        previous_x = self.x
+        self.move_x(delta_time)
+
+        for wall in walls:
+            if wall.check_col(self):
+                self.x = previous_x
+                self.x_velocity = 0
+                break
+
+        #attempt Y
+        previous_y = self.y
+        self.move_y(delta_time)
+
+        for wall in walls:
+            if wall.check_col(self):
+                self.y = previous_y
+                self.y_velocity = 0
+                break
 
 
     def jump(self):
@@ -167,27 +192,64 @@ class Player:
         else:
             return False
 
-    def detect_pl_collision(self, platform, previous_z):
 
-        if self.over_platform(platform):
+    def over_plat_location(self, platform, x, y):
 
-            # Landing on the platform
-            if (previous_z >= platform.z and
-                self.z <= platform.z and
-                self.z_velocity < 0):
+        if x + self.width > platform.x and x < platform.x + platform.width:
+            if y + self.depth > platform.y and y < platform.y + platform.depth:
+                return True
 
-                self.z = platform.z
+        return False
+
+    def detect_pl_collision(self, platforms, previous_x, previous_y, previous_z):
+
+        landing_platform = None
+
+        for platform in platforms:
+
+            if self.over_platform(platform):
+
+                # Landing on the platform - checks if a player is passing through a platform
+                if (previous_z >= platform.z and self.z <= platform.z and self.z_velocity < 0):
+
+                    #Find when the player crosses the platform
+                    t = (previous_z - platform.z) / (previous_z - self.z)
+
+                    #find X and Y position at the moment of landing
+                    land_x = previous_x + (self.x - previous_x) * t
+                    land_y = previous_y + (self.y - previous_y) * t
+
+                    #detect footprint overlap at moment of landing
+                    if self.over_plat_location(platform, land_x, land_y):
+                    
+                        if landing_platform is None or platform.z > landing_platform.z:
+                            landing_platform = platform   
+
+                # Already standing on the platform
+                elif abs(self.z - platform.z) < 0.001 and self.z_velocity == 0:
+                    if landing_platform is None or platform.z > landing_platform.z:
+                        landing_platform = platform
+
+        #player is standing on a platform
+        if landing_platform is not None:
+
+            if not self.is_grounded:
                 self.update_ground()
 
-            # Already standing on the platform
-            elif self.z == platform.z and self.z_velocity == 0:
-                self.update_ground()
+            else:
+                self.z_velocity = 0
 
-        else:
+            self.z = landing_platform.z
+            self.current_platform = landing_platform
+
+        #player is not standing on any surface
+        elif self.z > 0:
             self.is_grounded = False
+            self.current_platform = None
+        
     
 
-    def kinematic_updates(self, keyboard_inputs, delta_time, platform,):
+    def kinematic_updates(self, keyboard_inputs, delta_time, platforms, walls):
         
         #movement
         norm_x, norm_y = self.velocity_normalization(keyboard_inputs)
@@ -197,21 +259,23 @@ class Player:
         self.apply_gravity(delta_time)
 
         previous_z = self.z
+        previous_x = self.x
+        previous_y = self.y
+
         #move
-        self.move_x(delta_time)
-        self.move_y(delta_time)
+        self.wall_restricted_movements(delta_time, walls)
         self.move_z(delta_time)
 
         self.detect_ground()
-        self.detect_pl_collision(platform, previous_z)
+        self.detect_pl_collision(platforms, previous_x, previous_y, previous_z)
 
 
-    def update(self, keyboard_inputs, delta_time, platform):
+    def update(self, keyboard_inputs, delta_time, platforms, walls):
         #useful for adding movement and animations
         if self.health == 0:
             self.alive = False
 
-        self.kinematic_updates(keyboard_inputs, delta_time, platform)
+        self.kinematic_updates(keyboard_inputs, delta_time, platforms, walls)
         
         
     @property
