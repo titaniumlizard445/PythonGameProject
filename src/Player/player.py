@@ -15,6 +15,8 @@ class Player:
         #height
         self.z = 0
 
+        self.direction = 1
+
         #velocities
         self.x_velocity = 0
         self.y_velocity = 0
@@ -39,6 +41,15 @@ class Player:
         self.jumps_remaining = 1
         self.is_grounded = True
         self.total_jumps = 2
+        self.coyote_dur = 0.2
+        self.coyote_t = 0.0
+        self.jump_buf_dur = 0.12
+        self.jump_buf_t = 0.0
+
+        #Attacking
+        self.jab_w = 30
+        self.jab_h = 20
+        self.jab_d = 30
 
         #platform detection
         self.current_platform = None
@@ -48,6 +59,10 @@ class Player:
         self.max_health = 100
         self.alive = True
         self.mana = 50
+        self.currently_attacking = False
+        self.attack_cooldown = 0.0
+        self.attack_duration = 0.2
+        self.attack_direction = None
 
         #player display [Temporary colored box]
         self.color = (20, 50 , 150)
@@ -63,6 +78,7 @@ class Player:
 
     def move_z(self, dt):
         self.z += self.z_velocity*dt
+
 
     def wall_restricted_movements(self, delta_time, walls):
 
@@ -92,6 +108,84 @@ class Player:
             self.z_velocity = self.jump_strength
             self.is_grounded = False
             self.jumps_remaining -= 1
+
+
+    def attack(self):
+        if self.attack_cooldown <= 0 and not self.currently_attacking:
+            self.currently_attacking = True
+            self.attack_cooldown = self.attack_duration
+
+
+    def update_attack(self, dt):
+        if self.currently_attacking:
+            self.attack_cooldown -= dt
+            if self.attack_cooldown <= 0:
+                self.attack_cooldown = 0
+                self.currently_attacking = False
+
+    
+    def get_attack_hitbox(self):
+        if self.currently_attacking:
+
+            #if attack is horizontal
+            if self.is_grounded:
+
+                if self.x_velocity != 0:
+
+                    if self.direction == -1:
+                        hitbox = (self.x - self.jab_w, self.z - self.height / 2, self.jab_w, self.jab_h, self.jab_d)
+
+                    elif self.direction == 1:
+                        hitbox = (self.x, self.z - self.height / 2, self.jab_w, self.jab_h, self.jab_d)
+
+                else:
+                    if self.direction == 1:
+                        hitbox = (self.x, self.z + self.height, self.jab_h, self.jab_w, self.jab_d)
+                    elif self.direction == -1:
+                        hitbox = (self.x - self.jab_h, self.z + self.height, self.jab_h, self.jab_w, self.jab_d)
+                    
+            else:
+                if self.direction == 1:
+                    hitbox = (self.x + self.width, self.z, self.jab_h, self.jab_w, self.jab_d)
+                elif self.direction == -1:
+                    hitbox = (self.x - self.jab_h, self.z, self.jab_h, self.jab_w, self.jab_d)
+
+            return hitbox
+        
+        else:
+            return None
+
+
+    def request_jump(self):
+        if self.jumps_remaining > 0:
+            self.jump()
+        else:
+            self.jump_buf_t = self.jump_buf_dur
+
+
+    def update_jump_buffer(self, delta_time):
+        if self.jump_buf_t <= 0:
+            return
+
+        if self.jumps_remaining > 0:
+            self.jump()
+            self.jump_buf_t = 0
+
+        else:
+            self.jump_buf_t = max(0, self.jump_buf_t - delta_time)
+
+
+    def update_coyote_time(self, delta_time):
+
+        if self.is_grounded:
+            self.coyote_t = self.coyote_dur
+
+        elif self.coyote_t > 0:
+            self.coyote_t = max(0, self.coyote_t - delta_time)
+
+            if self.coyote_t == 0:
+                if self.jumps_remaining == self.total_jumps:
+                    self.jumps_remaining -= 1
             
 
     def apply_gravity(self, delta_time):
@@ -170,8 +264,10 @@ class Player:
         if not (keyboard_inputs[pygame.K_d] and keyboard_inputs[pygame.K_a]):
             if keyboard_inputs[pygame.K_a]:
                 input_x = -1
+                self.direction = -1
             if keyboard_inputs[pygame.K_d]:
                 input_x = 1
+                self.direction = 1
 
         magnitude = math.sqrt((input_x**2)+(input_y**2))
 
@@ -184,7 +280,7 @@ class Player:
 
     def over_platform(self, platform):
         if self.x + self.width > platform.x and self.x < platform.x + platform.width:
-            if self.y + self.depth > platform.y and self.y < platform.y + platform.depth:
+            if self.y > platform.y - platform.depth and self.y - self.depth < platform.y:
                 return True
             
             else:
@@ -196,7 +292,7 @@ class Player:
     def over_plat_location(self, platform, x, y):
 
         if x + self.width > platform.x and x < platform.x + platform.width:
-            if y + self.depth > platform.y and y < platform.y + platform.depth:
+            if y > platform.y - platform.depth and y - self.depth < platform.y:
                 return True
 
         return False
@@ -207,45 +303,42 @@ class Player:
 
         for platform in platforms:
 
-            if self.over_platform(platform):
 
-                # Landing on the platform - checks if a player is passing through a platform
-                if (previous_z >= platform.z and self.z <= platform.z and self.z_velocity < 0):
+            # Landing on the platform - checks if a player is passing through a platform
+            if (previous_z > platform.z and self.z <= platform.z and self.z_velocity < 0):
 
-                    #Find when the player crosses the platform
-                    t = (previous_z - platform.z) / (previous_z - self.z)
+                #Find when the player crosses the platform
+                t = (previous_z - platform.z) / (previous_z - self.z)
 
-                    #find X and Y position at the moment of landing
-                    land_x = previous_x + (self.x - previous_x) * t
-                    land_y = previous_y + (self.y - previous_y) * t
+                #find X and Y position at the moment of landing
+                land_x = previous_x + (self.x - previous_x) * t
+                land_y = previous_y + (self.y - previous_y) * t
 
-                    #detect footprint overlap at moment of landing
-                    if self.over_plat_location(platform, land_x, land_y):
+                #detect footprint overlap at moment of landing
+                if self.over_plat_location(platform, land_x, land_y):
                     
-                        if landing_platform is None or platform.z > landing_platform.z:
-                            landing_platform = platform   
-
-                # Already standing on the platform
-                elif abs(self.z - platform.z) < 0.001 and self.z_velocity == 0:
                     if landing_platform is None or platform.z > landing_platform.z:
-                        landing_platform = platform
+                        landing_platform = platform   
+
+            # Already standing on the platform
+            elif abs(self.z - platform.z) < 0.001 and self.z_velocity == 0 and self.over_platform(platform):
+                if landing_platform is None or platform.z > landing_platform.z:
+                    landing_platform = platform
 
         #player is standing on a platform
         if landing_platform is not None:
-
-            if not self.is_grounded:
-                self.update_ground()
-
-            else:
-                self.z_velocity = 0
-
+            self.update_ground()
             self.z = landing_platform.z
             self.current_platform = landing_platform
 
-        #player is not standing on any surface
-        elif self.z > 0:
-            self.is_grounded = False
+        else:
             self.current_platform = None
+
+            if self.z > 0:
+                self.is_grounded = False
+            else:
+                self.z = 0
+                self.update_ground()
         
     
 
@@ -266,8 +359,10 @@ class Player:
         self.wall_restricted_movements(delta_time, walls)
         self.move_z(delta_time)
 
-        self.detect_ground()
         self.detect_pl_collision(platforms, previous_x, previous_y, previous_z)
+        self.detect_ground()
+        self.update_coyote_time(delta_time)
+        self.update_jump_buffer(delta_time)
 
 
     def update(self, keyboard_inputs, delta_time, platforms, walls):
@@ -276,6 +371,7 @@ class Player:
             self.alive = False
 
         self.kinematic_updates(keyboard_inputs, delta_time, platforms, walls)
+        self.update_attack(delta_time)
         
         
     @property
@@ -287,12 +383,46 @@ class Player:
         )
 
 
+    @property
+    def depth_sort(self):
+        return self.y - self.depth / 2
+
+
+    def scale(self):
+        scale = 1.0 - (self.y / 1000)
+
+        return max(0.5, min(1.5, scale))
+
+
+    def get_screen_coords(self):
+        screen_x = self.x 
+        screen_y = self.y - self.z - self.height
+
+        return screen_x, screen_y
+
+
+    def get_shadow_height(self, platforms):
+        shadow_z = 0
+
+        for platform in platforms:
+            if platform.z <= self.z and self.over_platform(platform):
+                if platform.z > shadow_z:
+                    shadow_z = platform.z
+
+        return shadow_z
+
+
     def draw(self, screen):
-        pygame.draw.rect(
-            screen,
-            self.color,
-            (self.x, self.y - self.z - self.height, self.width, self.height)
-        )
+        scn_x, scn_y = self.get_screen_coords()
+        pygame.draw.rect(screen, self.color, (scn_x, scn_y, self.width, self.height))
+
+        if self.currently_attacking:
+            pygame.draw.rect(screen, (255, 120, 0), (self.x, self.y - self.z - self.height, self.width, self.height), 2)
+
+
+    def draw_shadow(self, screen, platforms):
+        shad_z = self.get_shadow_height(platforms)
+        pygame.draw.ellipse(screen, (40, 40, 40), (self.x, self.y - shad_z, self.width, 10), 0)
 
 
     def take_damage(self, incoming_damage):

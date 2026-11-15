@@ -13,7 +13,26 @@ class Platform:
         self.color = (100, 50, 20)
         self.top_color = (100, 100, 100)
 
+    
     def draw(self,screen):
-        pygame.draw.rect(screen, self.color, (self.x, self.z, self.width, self.height))
-        #draw 3D part
-        pygame.draw.polygon(screen, self.top_color, [(self.x, self.z), (self.x +self.width, self.z), (self.x +self.width - 50 ,self.z - self.depth), (self.x - 50, self.z - self.depth)], 0)
+        vertical_pos = self.y - self.z
+        pygame.draw.polygon(screen, self.top_color, [(self.x, vertical_pos), (self.x +self.width, vertical_pos), (self.x +self.width - self.depth ,vertical_pos - self.depth), (self.x - self.depth, vertical_pos - self.depth)], 0)
+
+
+    def draw_top(self, screen):
+        vertical_pos = self.y - self.z
+        pygame.draw.polygon(screen, self.top_color, [(self.x, vertical_pos), (self.x +self.width, vertical_pos), (self.x +self.width - self.depth ,vertical_pos - self.depth), (self.x - self.depth, vertical_pos - self.depth)], 0)
+
+    @property
+    def depth_sort(self):
+        return self.y - self.depth / 2
+
+
+    @property
+    def front_depth(self):
+        return self.y
+
+
+    @property
+    def back_depth(self):
+        return self.y - self.depth
