@@ -16,7 +16,7 @@ class Renderer:
 
         self.draw_occluding_walls(screen, player, walls, Wall.covers_player)
 
-    def draw_scene(self, screen, player, platforms, walls):
+    def draw_scene(self, screen, player, platforms, walls, enemies):
         draw_queue = []
 
         for platform in platforms:
@@ -26,6 +26,9 @@ class Renderer:
             draw_queue.append((wall.side_depth, 1, lambda w=wall: w.draw_side(screen)))
 
             draw_queue.append((wall.front_depth, 1, lambda w=wall: w.draw_front(screen)))
+
+        for enemy in enemies:
+            draw_queue.append((enemy.depth_sort, 1, lambda e=enemy: e.draw(screen)))
 
         # Draw environment in depth order
         draw_queue.sort(key=lambda item: (item[0], item[1]))

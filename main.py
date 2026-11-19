@@ -4,6 +4,7 @@ from src.Player.player import Player
 from src.Environment.platform import Platform
 from src.Environment.wall import Wall
 from src.Environment.renderer import Renderer
+from src.Enemies.enemy import Enemy
 pygame.init()
 
 #window
@@ -31,6 +32,9 @@ test_wall3 = Wall(700, 500, 0, 100, 60, 20)
 test_wall4 = Wall(700, 400, 0, 100, 60, 20)
 test_wall5 = Wall(750, 375, 20, 50, 50, 50)
 walls = [test_wall1, test_wall2, test_wall3, test_wall4, wall, test_wall5]
+
+test_enemy1 = Enemy(200,200)
+enemies = [test_enemy1]
 while running:
 
     #event handler
@@ -57,13 +61,36 @@ while running:
     keys = pygame.key.get_pressed()
     test_player.update(keys, dt, platforms, walls)
 
+    #enemy updates
+    e_copy = enemies.copy()
+    for e in enemies:
+        e.update(dt)
+        if not e.alive:
+            e_copy.remove(e)
+
+    enemies = e_copy
+
     #print("Platform:", test_player.current_platform, "Grounded:", test_player.is_grounded)
 
     # Build environment
 
     r = Renderer()
 
-    r.draw_scene(screen, test_player, platforms, walls)
+    r.draw_scene(screen, test_player, platforms, walls, enemies)
+
+    if test_player.currently_attacking:
+        atk_hitbox = test_player.get_attack_hitbox()
+
+        test_player.draw_attack(screen, atk_hitbox)
+
+        for enemy in enemies:
+            if enemy.invuln_t <= 0 and enemy.check_col(atk_hitbox):
+                enemy.been_hit = True
+                enemy.health -= 25
+                enemy.invuln_t = enemy.invuln_dur
+
+
+
     
     #display update
     pygame.display.flip()

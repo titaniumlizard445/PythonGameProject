@@ -47,9 +47,9 @@ class Player:
         self.jump_buf_t = 0.0
 
         #Attacking
-        self.jab_w = 30
-        self.jab_h = 20
-        self.jab_d = 30
+        self.jab_w = 50
+        self.jab_h = 30
+        self.jab_d = 45
 
         #platform detection
         self.current_platform = None
@@ -114,6 +114,7 @@ class Player:
         if self.attack_cooldown <= 0 and not self.currently_attacking:
             self.currently_attacking = True
             self.attack_cooldown = self.attack_duration
+            self.attack_direction = self.direction
 
 
     def update_attack(self, dt):
@@ -126,34 +127,55 @@ class Player:
     
     def get_attack_hitbox(self):
         if self.currently_attacking:
+            self.atk_y = (self.y - (self.depth / 2)) + (self.jab_d/2)
+
+            if self.attack_direction == -1:
+                if self.x_velocity != 0 and self.is_grounded:
+                    jab_x = self.x - self.jab_w
+                else:
+                    jab_x = self.x - self.jab_h
+            elif self.attack_direction == 1:
+                jab_x = self.x + self.width
+            else:
+                jab_x = None
 
             #if attack is horizontal
             if self.is_grounded:
 
+                #forward jab
                 if self.x_velocity != 0:
-
-                    if self.direction == -1:
-                        hitbox = (self.x - self.jab_w, self.z - self.height / 2, self.jab_w, self.jab_h, self.jab_d)
-
-                    elif self.direction == 1:
-                        hitbox = (self.x, self.z - self.height / 2, self.jab_w, self.jab_h, self.jab_d)
-
+                    hitbox = (jab_x, self.atk_y, self.z, self.jab_w, self.jab_h, self.jab_d)
+                
+                #stationary upward jab
                 else:
-                    if self.direction == 1:
-                        hitbox = (self.x, self.z + self.height, self.jab_h, self.jab_w, self.jab_d)
-                    elif self.direction == -1:
-                        hitbox = (self.x - self.jab_h, self.z + self.height, self.jab_h, self.jab_w, self.jab_d)
-                    
+                    hitbox = (jab_x, self.atk_y , self.z, self.jab_h, self.jab_w, self.jab_d)
+            
+            #basic aerial jab
             else:
-                if self.direction == 1:
-                    hitbox = (self.x + self.width, self.z, self.jab_h, self.jab_w, self.jab_d)
-                elif self.direction == -1:
-                    hitbox = (self.x - self.jab_h, self.z, self.jab_h, self.jab_w, self.jab_d)
+                hitbox = (jab_x, self.atk_y, self.z, self.jab_h, self.jab_w, self.jab_d)
 
+            #hitbox = tuple (xpos, ypos, jab width, jab height, jab depth)
             return hitbox
         
         else:
             return None
+
+
+    def draw_attack(self, screen, hitbox):
+        drawable_hit = list(hitbox)
+        drawable_hit.remove(self.jab_d)
+        drawable_hit.remove(self.atk_y)
+
+        x, z, w, h = drawable_hit
+
+        if not self.is_grounded:
+            new_hitbox = (x, 0 - z + self.y, w, h)
+        elif self.x_velocity != 0:
+            new_hitbox = (x, z + self.y - self.height, w, h)
+        else:
+            new_hitbox = (x, (z + self.height) / 2 + self.y - (2 * self.height), w, h)
+
+        pygame.draw.rect(screen, (120, 120, 0), new_hitbox, 2)
 
 
     def request_jump(self):
@@ -415,9 +437,6 @@ class Player:
     def draw(self, screen):
         scn_x, scn_y = self.get_screen_coords()
         pygame.draw.rect(screen, self.color, (scn_x, scn_y, self.width, self.height))
-
-        if self.currently_attacking:
-            pygame.draw.rect(screen, (255, 120, 0), (self.x, self.y - self.z - self.height, self.width, self.height), 2)
 
 
     def draw_shadow(self, screen, platforms):
