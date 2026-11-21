@@ -10,18 +10,12 @@ class Platform:
         self.depth = depth
         self.width = width
         self.height = height
-        self.color = (100, 50, 20)
-        self.top_color = (100, 100, 100)
+        self.color = (30, 50, 20)
 
-    
-    def draw(self,screen):
+
+    def draw(self, screen):
         vertical_pos = self.y - self.z
-        pygame.draw.polygon(screen, self.top_color, [(self.x, vertical_pos), (self.x +self.width, vertical_pos), (self.x +self.width - self.depth ,vertical_pos - self.depth), (self.x - self.depth, vertical_pos - self.depth)], 0)
-
-
-    def draw_top(self, screen):
-        vertical_pos = self.y - self.z
-        pygame.draw.polygon(screen, self.top_color, [(self.x, vertical_pos), (self.x +self.width, vertical_pos), (self.x +self.width - self.depth ,vertical_pos - self.depth), (self.x - self.depth, vertical_pos - self.depth)], 0)
+        pygame.draw.polygon(screen, self.color, [(self.x, vertical_pos), (self.x +self.width, vertical_pos), (self.x +self.width ,vertical_pos - self.depth), (self.x, vertical_pos - self.depth)], 0)
 
     @property
     def depth_sort(self):

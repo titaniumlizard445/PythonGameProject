@@ -44,6 +44,16 @@ class Enemy:
         return self.y - self.depth / 2
 
 
+    @property
+    def sort_z(self):
+        return self.z + self.height / 2
+
+
+    @property
+    def sort_value(self):
+        return self.depth_sort + (self.sort_z * 0.5)
+
+
     def check_col(self, incoming_hitbox):
         atk_x, atk_y, atk_z, atk_w, atk_h, atk_d = incoming_hitbox
         if self.x + self.width >= atk_x  and self.x  <= atk_x + atk_w:
@@ -58,6 +68,7 @@ class Enemy:
         if self.health <= 0:
             self.health = 0
             self.alive = False
+            self.been_hit = False
 
         if self.invuln_t > 0:
             self.invuln_t = max( 0, self.invuln_t - dt)
