@@ -2,10 +2,10 @@
 
 class Renderer:
 
-    def draw_shadow(self, screen, player, platforms, walls):
-        player.draw_shadow(screen, platforms)
+    def draw_shadow(self, screen, player, platforms, walls, slopes):
+        player.draw_shadow(screen, platforms, slopes)
 
-        self.draw_occluding_walls(screen, player, player.get_shadow_bounds(platforms),walls)
+        self.draw_occluding_walls(screen, player, player.get_shadow_bounds(platforms, slopes),walls)
 
 
     def draw_player(self, screen, player, walls):
@@ -14,18 +14,24 @@ class Renderer:
         self.draw_occluding_walls(screen, player, player.get_vis_bounds(), walls)
 
 
-    def draw_scene(self, screen, player, platforms, walls, enemies):
+    def draw_scene(self, screen, player, platforms, walls, enemies, slopes):
         draw_queue = []
-        for platform in platforms:
-            print(
-                "Platform:", platform.depth_sort,
-                "Player:", player.sort_value,
-                "Player depth:", player.depth_sort,
-                "Player Z:", player.z
-            )
 
         for platform in platforms:
-            draw_queue.append((platform.depth_sort, 1, lambda p=platform: p.draw(screen)))
+            platform_sort = platform.depth_sort
+
+            if player.z >= platform.z:
+                platform_sort = min(platform_sort, player.depth_sort - 0.001)
+
+            draw_queue.append((platform_sort, 1, lambda p=platform: p.draw(screen)))
+
+        for slope in slopes:
+            slope_sort = slope.y - slope.d / 2
+
+            if slope.overlaps_player(player) and player.z >= slope.get_player_surface_height(player):
+                slope_sort = player.depth_sort - 0.001
+
+            draw_queue.append((slope_sort, 1, lambda s=slope: s.draw(screen)))
 
         for wall in walls:
             draw_queue.append((wall.front_depth, 1, lambda w=wall: w.draw_front(screen)))
@@ -34,10 +40,10 @@ class Renderer:
             draw_queue.append((enemy.depth_sort, 1, lambda e=enemy: e.draw(screen)))
 
         
-        draw_queue.append((player.depth_sort, 0, lambda: self.draw_shadow(screen, player, platforms, walls)))
+        draw_queue.append((player.depth_sort, 0, lambda: self.draw_shadow(screen, player, platforms, walls, slopes)))
 
         
-        draw_queue.append((player.sort_value, 1, lambda: self.draw_player(screen, player, walls)))
+        draw_queue.append((player.depth_sort, 1, lambda: self.draw_player(screen, player, walls)))
 
         
         draw_queue.sort(key=lambda item: (item[0], item[1]))

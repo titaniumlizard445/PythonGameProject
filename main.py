@@ -5,6 +5,7 @@ from src.Environment.platform import Platform
 from src.Environment.wall import Wall
 from src.Environment.renderer import Renderer
 from src.Enemies.enemy import Enemy
+from src.Environment.slope import Slope
 
 pygame.init()
 
@@ -31,6 +32,10 @@ platforms = [platform]
 
 wall = Wall(200, 500, 20, 400, 30, 40)
 walls = [wall]
+
+slope = Slope(700, 500, 0, 100, 80, 200)
+slope2 = Slope(500, 400, 50, 100, 50, 200, direction=-1)
+slopes = [slope, slope2]
 
 enemy = Enemy(400, 300)
 enemies = [enemy]
@@ -59,7 +64,7 @@ while running:
 
     #Character Controls
     keys = pygame.key.get_pressed()
-    player.update(keys, dt, platforms, walls)
+    player.update(keys, dt, platforms, walls, slopes)
 
     #enemy updates
     for enemy in enemies:
@@ -70,7 +75,7 @@ while running:
     # Build environment
 
 
-    r.draw_scene(screen, player, platforms, walls, enemies)
+    r.draw_scene(screen, player, platforms, walls, enemies, slopes)
 
 
     if player.currently_attacking:
