@@ -54,6 +54,8 @@ class Player:
         self.attack_cooldown = 0.0
         self.attack_duration = 0.2
         self.attack_direction = None
+        self.invuln_t = 0.0
+        self.invuln_dur = 0.4
 
         #Environment detection
         self.current_platform = None
@@ -369,6 +371,20 @@ class Player:
         pygame.draw.rect(screen, (120, 120, 0), new_hitbox, 2)
 
 
+    def check_col(self, incoming_hitbox):
+        atk_x, atk_y, atk_z, atk_w, atk_h, atk_d = incoming_hitbox
+        if self.x + self.width >= atk_x  and self.x  <= atk_x + atk_w:
+            if self.y >= atk_y - atk_d and self.y - self.depth <= atk_y:
+                if self.z + self.height >= atk_z  and self.z  <= atk_z + atk_h:
+                    return True
+
+        return False
+
+
+    def update_invuln(self, dt):
+        self.invuln_t = max(0, self.invuln_t - dt)
+
+
     #METHODS FOR PLATFORM COLLISION ######################################################
 
     
@@ -470,6 +486,7 @@ class Player:
 
         self.kinematic_updates(keyboard_inputs, delta_time, platforms, walls, slopes)
         self.update_attack(delta_time)
+        self.update_invuln(delta_time)
 
 
     # METHODS FOR DEPTH SORTING AND PROPERTIES ###############################################
@@ -548,7 +565,9 @@ class Player:
     #METHODS FOR PLAYER STATS ###############################################################
 
     def take_damage(self, incoming_damage):
-        self.health = max(0, (self.health - incoming_damage))
+        if self.invuln_t <= 0:
+            self.health = max(0, (self.health - incoming_damage))
+            self.invuln_t = self.invuln_dur
 
 
     def heal(self, amount):

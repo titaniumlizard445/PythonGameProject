@@ -68,7 +68,7 @@ while running:
 
     #enemy updates
     for enemy in enemies:
-        enemy.update(dt)
+        enemy.update(dt, player)
 
     enemies = [enemy for enemy in enemies if enemy.alive]
 
@@ -88,6 +88,16 @@ while running:
                 enemy.been_hit = True
                 enemy.health -= 25
                 enemy.invuln_t = enemy.invuln_dur
+
+    
+    for enemy in enemies:
+        if enemy.alive:
+            atk_hitbox = enemy.get_attack_hitbox()
+            enemy.draw_attack_hitbox(screen)
+
+            if atk_hitbox is not None:
+                if player.invuln_t <= 0 and player.check_col(atk_hitbox):
+                    player.take_damage(25)
 
     #display update
     pygame.display.flip()
