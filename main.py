@@ -38,7 +38,12 @@ slope2 = Slope(500, 400, 50, 100, 50, 200, direction=-1)
 slopes = [slope, slope2]
 
 enemy = Enemy(400, 300)
-enemies = [enemy]
+enemy2 = Enemy(500, 300)
+enemy3 = Enemy(600, 300)
+enemy4 = Enemy(400, 600)
+enemy5 = Enemy(500, 600)
+enemy6 = Enemy(600, 600)
+enemies = [enemy, enemy2, enemy3, enemy4, enemy5, enemy6]
 
 while running:
 
@@ -68,15 +73,23 @@ while running:
 
     #enemy updates
     for enemy in enemies:
-        enemy.update(dt, player)
+        other_enemies = []
+        for other in enemies:
+            if other != enemy:
+                other_enemies.append(other)
 
-    enemies = [enemy for enemy in enemies if enemy.alive]
+        enemy.update(dt, player, walls, other_enemies)
+
+    surviving = []
+    for enemy in enemies:
+        if enemy.alive:
+            surviving.append(enemy)
+
+    enemies = surviving
 
     # Build environment
 
-
     r.draw_scene(screen, player, platforms, walls, enemies, slopes)
-
 
     if player.currently_attacking:
         atk_hitbox = player.get_attack_hitbox()
@@ -88,7 +101,6 @@ while running:
                 enemy.been_hit = True
                 enemy.health -= 25
                 enemy.invuln_t = enemy.invuln_dur
-
     
     for enemy in enemies:
         if enemy.alive:
@@ -97,7 +109,7 @@ while running:
 
             if atk_hitbox is not None:
                 if player.invuln_t <= 0 and player.check_col(atk_hitbox):
-                    player.take_damage(25)
+                    player.take_damage(enemy.attack_damage)
 
     #display update
     pygame.display.flip()
