@@ -31,6 +31,10 @@ class Renderer:
             if slope.overlaps_player(player) and player.z >= slope.get_player_surface_height(player):
                 slope_sort = player.depth_sort - 0.001
 
+            for enemy in enemies:
+                if slope.overlaps_player(enemy) and enemy.z >= slope.get_player_surface_height(enemy):
+                    slope_sort = min(slope_sort, enemy.depth_sort - 0.001)
+
             draw_queue.append((slope_sort, 1, lambda s=slope: s.draw(screen)))
 
         for wall in walls:

@@ -27,10 +27,10 @@ r = Renderer()
 
 player = Player()
 
-platform = Platform(200, 470, 20, 400, 30, 40)
+platform = Platform(200, 500, 30, 400, 0, 40)
 platforms = [platform]
 
-wall = Wall(200, 500, 20, 400, 30, 40)
+wall = Wall(200, 500, 0, 400, 30, 40)
 walls = [wall]
 
 slope = Slope(700, 500, 0, 100, 80, 200)
@@ -60,7 +60,7 @@ while running:
 
             elif event.key == pygame.K_j:
                 player.attack()
-
+ 
     #Fps step
     dt = clock.tick(settings.fps) / 1000
 
@@ -69,7 +69,7 @@ while running:
 
     #Character Controls
     keys = pygame.key.get_pressed()
-    player.update(keys, dt, platforms, walls, slopes)
+    player.update(keys, dt, platforms, walls, slopes, enemies)
 
     #enemy updates
     for enemy in enemies:
@@ -78,7 +78,7 @@ while running:
             if other != enemy:
                 other_enemies.append(other)
 
-        enemy.update(dt, player, walls, other_enemies)
+        enemy.update(dt, player, walls, other_enemies, slopes)
 
     surviving = []
     for enemy in enemies:

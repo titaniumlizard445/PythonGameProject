@@ -87,7 +87,7 @@ class Player:
         self.z += self.z_velocity*dt
 
 
-    def wall_restricted_movements(self, delta_time, walls):
+    def wall_restricted_movements(self, delta_time, walls, enemies):
 
         #attempt X
         previous_x = self.x
@@ -95,6 +95,12 @@ class Player:
 
         for wall in walls:
             if wall.check_col(self):
+                self.x = previous_x
+                self.x_velocity = 0
+                break
+        
+        for enemy in enemies:
+            if enemy.alive and enemy.check_enemy_collision(self):
                 self.x = previous_x
                 self.x_velocity = 0
                 break
@@ -108,6 +114,13 @@ class Player:
                 self.y = previous_y
                 self.y_velocity = 0
                 break
+
+        for enemy in enemies:
+            if enemy.alive and enemy.check_enemy_collision(self):
+                self.y = previous_y
+                self.y_velocity = 0
+                break
+
 
     
     def deccelerate(self, delta_time, vel, deccel):
@@ -206,7 +219,7 @@ class Player:
         return norm_x, norm_y
     
     
-    def kinematic_updates(self, keyboard_inputs, delta_time, platforms, walls, slopes):
+    def kinematic_updates(self, keyboard_inputs, delta_time, platforms, walls, slopes, enemies):
         
         #movement
         norm_x, norm_y = self.velocity_normalization(keyboard_inputs)
@@ -228,7 +241,7 @@ class Player:
         previous_y = self.y
 
         #move
-        self.wall_restricted_movements(delta_time, walls)
+        self.wall_restricted_movements(delta_time, walls, enemies)
         self.move_z(delta_time)
 
         self.detect_pl_collision(platforms, previous_x, previous_y, previous_z)
@@ -479,12 +492,12 @@ class Player:
     #GAME UPDATE METHOD ####################################################################
 
     
-    def update(self, keyboard_inputs, delta_time, platforms, walls, slopes):
+    def update(self, keyboard_inputs, delta_time, platforms, walls, slopes, enemies):
         #useful for adding movement and animations
         if self.health == 0:
             self.alive = False
 
-        self.kinematic_updates(keyboard_inputs, delta_time, platforms, walls, slopes)
+        self.kinematic_updates(keyboard_inputs, delta_time, platforms, walls, slopes, enemies)
         self.update_attack(delta_time)
         self.update_invuln(delta_time)
 

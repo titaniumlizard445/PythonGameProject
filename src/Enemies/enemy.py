@@ -2,6 +2,7 @@
 
 import pygame
 import random
+import math
 
 class Enemy:
 
@@ -15,6 +16,11 @@ class Enemy:
         #movement
         self.x_speed = 150
         self.y_speed = 100
+        self.current_slope = None
+        self.max_slope_gradient = 0.75
+        self.max_x_vel = 300
+        self.gravity = 980
+        self.x_velocity = 0
 
         #size
         self.width = 50
@@ -123,7 +129,7 @@ class Enemy:
         return False
 
 
-    def update(self, dt, player, walls, enemies):
+    def update(self, dt, player, walls, enemies, slopes):
         if self.health <= 0:
             self.health = 0
             self.alive = False
@@ -139,6 +145,9 @@ class Enemy:
             self.attack_cooldown = max(0, self.attack_cooldown - dt)
 
         self.detect_player(player)
+        self.detect_slope(slopes)
+        self.follow_slope()
+        self.slide_on_slope(dt)
 
         if self.state == "attacking":
             self.update_attack(dt, walls, player, enemies)
@@ -204,6 +213,15 @@ class Enemy:
                 self.player_detected = True
 
 
+    def detect_slope(self, slopes):
+        self.current_slope = None
+
+        for slope in slopes:
+            if slope.overlaps_player(self):
+                self.current_slope = slope
+                break
+
+
     def pursue(self, player, dt, walls, enemies):
         e_cntr_x = self.x + self.width / 2
         e_cntr_y = self.y - self.depth / 2
@@ -218,13 +236,24 @@ class Enemy:
         dx = abs(p_cntr_x - e_cntr_x)
         dy = abs(p_cntr_y - e_cntr_y)
 
+        
+        move_x = 0
+
         if dx > self.attack_range:
             move_x = min(dx - self.attack_range, self.x_speed * dt)
 
             if p_cntr_x < e_cntr_x:
                 move_x *= -1
 
-            self.wall_restricted_x(move_x, walls, player, enemies)
+            if self.current_slope is not None:
+                if self.current_slope.gradient >= self.max_slope_gradient:
+                    if move_x * self.current_slope.direction > 0:
+                        move_x = 0
+
+        displacement = self.wall_restricted_x(move_x, walls, player, enemies)
+
+        if displacement == 0 and move_x != 0:
+            self.x_velocity = 0
 
         if dy > self.attack_range:
             move_y = min(dy - self.attack_range, self.y_speed * dt)
@@ -336,7 +365,7 @@ class Enemy:
             self.x = previous_x
 
         for enemy in enemies:
-            if enemy.alive and self.check_body_collision(enemy):
+            if enemy.alive and self.check_enemy_collision(enemy):
                 self.x = previous_x
                 break
         
@@ -356,7 +385,7 @@ class Enemy:
             self.y = previous_y
 
         for enemy in enemies:
-            if enemy.alive and self.check_body_collision(enemy):
+            if enemy.alive and self.check_enemy_collision(enemy):
                 self.y = previous_y
                 break
 
@@ -375,3 +404,58 @@ class Enemy:
             return False
 
         return True
+
+
+    def check_enemy_collision(self, other):
+        mini_w = self.width * 0.5
+        mini_d = self.depth * 0.5
+
+        mini_w_other = other.width * 0.5
+        mini_d_other = other.depth * 0.5
+
+        mini_x = self.x + (self.width - mini_w) / 2
+        mini_x_other = other.x + (other.width - mini_w_other) / 2
+
+        mini_y = self.y - (self.depth - mini_d) / 2
+        mini_y_other = other.y - (other.depth - mini_d_other) / 2
+
+        # X overlap
+        if mini_x + mini_w <= mini_x_other or mini_x >= mini_x_other + mini_w_other:
+            return False
+        
+        # Y overlap
+        if mini_y <= mini_y_other - mini_d_other or mini_y - mini_d >= mini_y_other:
+            return False
+        
+        # Z overlap
+        if self.z + self.height <= other.z or self.z >= other.z + other.height:
+            return False
+        
+        return True
+
+
+    def follow_slope(self):
+        if self.current_slope is not None:
+            self.z = self.current_slope.get_player_surface_height(self)
+
+        else:
+            self.z = 0
+
+
+    def slide_on_slope(self, dt):
+        if self.current_slope is None:
+            self.x_velocity = 0
+            return
+
+        if self.current_slope.gradient < self.max_slope_gradient:
+            self.x_velocity = 0
+            return
+
+        slope_angle = math.atan(self.current_slope.gradient)
+        acceleration = self.gravity * math.sin(slope_angle)
+
+        if self.current_slope.direction == 1:
+            acceleration *= -1
+
+        self.x_velocity += acceleration * dt
+        self.x_velocity = max(-self.max_x_vel, min(self.max_x_vel, self.x_velocity))
