@@ -42,6 +42,7 @@ class Renderer:
 
         for enemy in enemies:
             draw_queue.append((enemy.depth_sort, 1, lambda e=enemy: e.draw(screen)))
+            draw_queue.append((enemy.depth_sort, 2, lambda e=enemy: e.draw_position_target(screen)))
 
         
         draw_queue.append((player.depth_sort, 0, lambda: self.draw_shadow(screen, player, platforms, walls, slopes)))

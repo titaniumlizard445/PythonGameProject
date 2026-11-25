@@ -6,64 +6,217 @@ import math
 
 class Enemy:
 
-    def __init__(self, x, y, z=0):
+    attack_priority = ("basic", "heavy", "fast")
+    attack_priority_index = 0
+
+    def __init__(self, e_type, x, y, z=0, boss=False):
         #position
         self.x = x
         self.y = y
         self.z = z
         self.direction = 1
 
+        self.enemy_types = {
+            "basic":{
+                "x_speed": 150,
+                "y_speed": 100,
+                "max_x_vel": 300,
+                "width": 50,
+                "height": 80,
+                "depth": 40,
+                "health": 100,
+                "max_health": 100,
+                "color": (0, 250, 100), #colors are temporary for visual testing
+                "attack_range": 70,
+                "position_style": "balanced",
+                "reposition_distance": 150,
+                "reposition_delay": 0.5,
+                "attacks":{
+                    "basic punch": {
+                        "windup": 0.4,
+                        "active": 0.15,
+                        "recovery": 0.5,
+                        "cooldown": 0.8,
+                        "damage": 25,
+                        "width": 70,
+                        "height": 40,
+                        "depth": 50,
+                        "lunge": 0,
+                        "lunge speed": 0
+                    },
+                    "heavy punch": {
+                        "windup": 0.7,
+                        "active": 0.25,
+                        "recovery": 0.8,
+                        "cooldown": 1.3,
+                        "damage": 40,
+                        "width": 100,
+                        "height": 65,
+                        "depth": 65,
+                        "lunge": 45,
+                        "lunge speed": 180
+                    }
+                }
+            },
+            "heavy":{
+                "x_speed": 100,
+                "y_speed": 75,
+                "max_x_vel": 175,
+                "width": 70,
+                "height":110,
+                "depth": 50,
+                "health": 150,
+                "max_health": 150,
+                "color": (250, 120, 100), #colors are temporary for visual testing
+                "attack_range": 80,
+                "position_style": "front",
+                "reposition_distance": 250,
+                "reposition_delay": 1.0,
+                "attacks":{
+                    "basic punch": {
+                        "windup": 0.6,
+                        "active": 0.25,
+                        "recovery": 0.75,
+                        "cooldown": 1.2,
+                        "damage": 45,
+                        "width": 80,
+                        "height": 50,
+                        "depth": 55,
+                        "lunge": 0,
+                        "lunge speed": 0
+                    },
+                    "heavy punch": {
+                        "windup": 0.9,
+                        "active": 0.35,
+                        "recovery": 1.0,
+                        "cooldown": 1.5,
+                        "damage": 60,
+                        "width": 100,
+                        "height": 65,
+                        "depth": 65,
+                        "lunge": 65,
+                        "lunge speed": 130
+                    }
+                }
+            },
+            "fast":{
+                "x_speed": 220,
+                "y_speed": 140,
+                "max_x_vel": 400,
+                "width": 50,
+                "height": 65,
+                "depth": 45,
+                "health": 75,
+                "max_health": 75,
+                "color": (50, 150, 100), #colors are temporary for visual testing
+                "attack_range": 60,
+                "position_style": "flank",
+                "reposition_distance": 100,
+                "reposition_delay": 0.25,
+                "attacks":{
+                    "basic punch": {
+                        "windup": 0.2,
+                        "active": 0.125,
+                        "recovery": 0.3,
+                        "cooldown": 0.4,
+                        "damage": 20,
+                        "width": 65,
+                        "height": 35,
+                        "depth": 40,
+                        "lunge": 0,
+                        "lunge speed": 0
+                    },
+                    "heavy punch": {
+                        "windup": 0.7,
+                        "active": 0.25,
+                        "recovery": 0.8,
+                        "cooldown": 1.3,
+                        "damage": 40,
+                        "width": 100,
+                        "height": 65,
+                        "depth": 65,
+                        "lunge": 85,
+                        "lunge speed": 275
+                    }
+                }
+            }
+        }
+
+        self.boss_types = {
+            "basic":{
+                "x_speed": 100,
+                "y_speed": 100,
+                "max_x_vel": 300,
+                "width": 80,
+                "height": 150,
+                "depth": 60,
+                "health": 300,
+                "max_health": 300,
+                "color": (150, 250, 100), #colors are temporary for visual testing
+                "attack_range": 150,
+                "position_style": "front",
+                "reposition_distance": 250,
+                "reposition_delay": 1.0,
+                "attacks":{
+                    "basic punch": {
+                        "windup": 0.4,
+                        "active": 0.15,
+                        "recovery": 0.5,
+                        "cooldown": 0.8,
+                        "damage": 25,
+                        "width": 70,
+                        "height": 40,
+                        "depth": 50,
+                        "lunge": 0,
+                        "lunge speed": 0
+                    },
+                    "heavy punch": {
+                        "windup": 0.7,
+                        "active": 0.25,
+                        "recovery": 0.8,
+                        "cooldown": 1.3,
+                        "damage": 40,
+                        "width": 100,
+                        "height": 65,
+                        "depth": 65,
+                        "lunge": 45,
+                        "lunge speed": 180
+                    }
+                }
+            }            
+        }
+
+        if not boss:
+            self.enemy_data = self.enemy_types[e_type]
+        else:
+            self.enemy_data = self.boss_types[e_type]
+
         #movement
-        self.x_speed = 150
-        self.y_speed = 100
+        self.x_speed = self.enemy_data["x_speed"]
+        self.y_speed = self.enemy_data["y_speed"]
         self.current_slope = None
         self.max_slope_gradient = 0.75
-        self.max_x_vel = 300
+        self.max_x_vel = self.enemy_data["max_x_vel"]
         self.gravity = 980
         self.x_velocity = 0
 
         #size
-        self.width = 50
-        self.height = 80
-        self.depth = 40
+        self.width = self.enemy_data["width"]
+        self.height = self.enemy_data["height"]
+        self.depth = self.enemy_data["depth"]
 
         #stats
-        self.health = 100
-        self.max_health = 100
+        self.health = self.enemy_data["health"]
+        self.max_health = self.enemy_data["max_health"]
         self.alive = True
-        self.color = (0, 250, 100)
+        self.color = self.enemy_data["color"]
 
         #combat
         self.been_hit = False
         self.invuln_t = 0.0
         self.invuln_dur = 0.25
-        self.attack_range = 70
-        self.attacks = {
-            "basic punch": {
-                "windup": 0.4,
-                "active": 0.15,
-                "recovery": 0.5,
-                "cooldown": 0.8,
-                "damage": 25,
-                "width": 70,
-                "height": 40,
-                "depth": 50,
-                "lunge": 0,
-                "lunge speed": 0
-            },
-            "heavy punch": {
-                "windup": 0.7,
-                "active": 0.25,
-                "recovery": 0.8,
-                "cooldown": 1.3,
-                "damage": 40,
-                "width": 100,
-                "height": 65,
-                "depth": 65,
-                "lunge": 45,
-                "lunge speed": 180
-            }
-        }
+        self.attack_range = self.enemy_data["attack_range"]
+        self.attacks = self.enemy_data["attacks"]
         self.windup_duration = 0.4
         self.active_duration = 0.15
         self.recovery_duration = 0.5
@@ -76,18 +229,26 @@ class Enemy:
         self.lunge_dist = 0
 
         #attack dimensions
-        self.atk_w = 70
-        self.atk_h = 40
-        self.atk_d = 50
+        self.atk_w = 0
+        self.atk_h = 0
+        self.atk_d = 0
 
         #AI
-        self.awareness_range = 250
+        self.awareness_range = 400
         self.player_detected = False
         self.state = "idle"
-        self.current_attack = "basic punch"
+        self.current_attack = "placeholder"
         self.attack_phase = ""
         self.attack_timer = 0.0
         self.attack_target_y = 0
+        self.target_x = None
+        self.target_y = None
+        self.has_position = False
+        self.position_timer = 0.0
+        self.position_style = self.enemy_data["position_style"]
+        self.reposition_distance = self.enemy_data["reposition_distance"]
+        self.reposition_delay = self.enemy_data["reposition_delay"]
+        self.enemy_type = e_type
 
 
     def get_screen_coords(self):
@@ -149,6 +310,12 @@ class Enemy:
         self.follow_slope()
         self.slide_on_slope(dt)
 
+        if self.x_velocity != 0:
+            displacement = self.wall_restricted_x(self.x_velocity * dt, walls, player, enemies)
+
+            if displacement == 0:
+                self.x_velocity = 0
+
         if self.state == "attacking":
             self.update_attack(dt, walls, player, enemies)
 
@@ -158,10 +325,43 @@ class Enemy:
 
 
     def combat_checks(self, player, dt, walls, enemies):
+        player_center = player.x + player.width / 2
+        enemy_center = self.x + self.width / 2
+
+        if player_center > enemy_center:
+            self.direction = 1
+        else:
+            self.direction = -1
+
         if self.player_detected:
-            if self.in_attack_range(player) and self.attack_cooldown <= 0:
+            if self.has_position:
+                self.position_timer += dt
+
+                dx = abs(player.x - self.target_x)
+                dy = abs(player.y - self.target_y)
+
+                if (dx > self.reposition_distance or dy > self.reposition_distance) and self.position_timer >= self.reposition_delay:
+                    self.has_position = False
+
+            if not self.has_position:
+                self.choose_position(player, enemies)
+
+                if self.has_position:
+                    self.state = "repositioning"
+
+            if self.state == "repositioning":
+                self.move_to_position(dt, walls, player, enemies)
+
+                dx = abs(self.target_x - self.x)
+                dy = abs(self.target_y - self.y)
+
+                if dx <= 5 and dy <= 5:
+                    self.state = "chasing"
+
+            elif self.in_attack_range(player) and self.attack_cooldown <= 0 and self.can_attack(enemies, player):
                 if self.state != "attacking":
                     self.state = "attacking"
+                    Enemy.attack_priority_index = (Enemy.attack_priority.index(self.enemy_type) + 1) % len(Enemy.attack_priority)
                     self.attack_phase = "windup"
                     self.attack_timer = 0
                     self.attack_target_y = player.y - player.depth / 2
@@ -310,6 +510,10 @@ class Enemy:
                 self.attack_phase = ""
                 self.attack_timer = 0
                 self.attack_cooldown = self.attack_cooldown_duration
+                
+                #if self.has_position:
+                    #self.state = "repositioning"
+                #else:
                 self.state = "chasing"
 
 
@@ -365,7 +569,7 @@ class Enemy:
             self.x = previous_x
 
         for enemy in enemies:
-            if enemy.alive and self.check_enemy_collision(enemy):
+            if enemy is not self and enemy.alive and self.check_enemy_collision(enemy):
                 self.x = previous_x
                 break
         
@@ -385,7 +589,7 @@ class Enemy:
             self.y = previous_y
 
         for enemy in enemies:
-            if enemy.alive and self.check_enemy_collision(enemy):
+            if enemy is not self and enemy.alive and self.check_enemy_collision(enemy):
                 self.y = previous_y
                 break
 
@@ -459,3 +663,104 @@ class Enemy:
 
         self.x_velocity += acceleration * dt
         self.x_velocity = max(-self.max_x_vel, min(self.max_x_vel, self.x_velocity))
+
+
+    def choose_position(self, player, enemies):
+        self.has_position = False
+        if self.position_style == "balanced":
+            positions = [(-100, 0), (100, 0), (-70, -70), (70, -70), (-70, 70), (70, 70)]
+
+        elif self.position_style == "front":
+            positions = [(-100, 0), (100, 0), (-70, 70), (70, 70), (-70, -70), (70, -70)]
+
+        elif self.position_style == "flank":
+            positions = [(-70, -70), (70, -70), (-70, 70), (70, 70), (-100, 0), (100, 0)]
+
+        for offset_x, offset_y in positions:
+            target_x = player.x + offset_x
+            target_y = player.y + offset_y
+
+            occupied = False
+
+            for enemy in enemies:
+                if enemy is not self and enemy.has_position:
+                    dx = abs(enemy.target_x - target_x)
+                    dy = abs(enemy.target_y - target_y)
+
+                    if dx < 50 and dy < 40:
+                        occupied = True
+                        break
+
+            if not occupied:
+                self.target_x = target_x
+                self.target_y = target_y
+                self.has_position = True
+                self.position_timer = 0.0
+                return
+
+
+    def move_to_position(self, dt, walls, player, enemies):
+        dx = self.target_x - self.x
+
+        if abs(dx) > 5:
+            move_x = min(abs(dx), self.x_speed * dt)
+
+            if dx < 0:
+                move_x *= -1
+
+            self.wall_restricted_x(move_x, walls, player, enemies)
+
+        dy = self.target_y - self.y
+
+        if abs(dy) > 5:
+            move_y = min(abs(dy), self.y_speed * dt)
+
+            if dy < 0:
+                move_y *= -1
+
+            self.wall_restricted_y(move_y, walls, player, enemies)
+
+
+    def draw_position_target(self, screen):
+        if self.has_position:
+            screen_x = self.target_x
+            screen_y = self.target_y - self.z - 10
+
+            pygame.draw.circle(
+                screen,
+                (255, 255, 0),
+                (int(screen_x), int(screen_y)),
+                8,
+                2
+            )
+
+            pygame.draw.line(screen, (255, 255, 0), (int(self.x + self.width / 2), int(self.y - self.z - self.height / 2)),(int(screen_x), int(screen_y)), 1)
+
+
+    def can_attack(self, enemies, player):
+        attackers = 0
+        eligible_types = set()
+
+        for enemy in enemies:
+            if enemy is not self and enemy.alive:
+                if enemy.state == "attacking":
+                    attackers += 1
+
+            if (enemy.alive and enemy.player_detected and enemy.state not in ("attacking", "repositioning") and enemy.attack_cooldown <= 0 and enemy.in_attack_range(player)):
+                eligible_types.add(enemy.enemy_type)
+
+        if attackers >= 3:
+            return False
+
+        for offset in range(len(Enemy.attack_priority)):
+            index = (Enemy.attack_priority_index + offset) % len(Enemy.attack_priority)
+
+            preferred_type = Enemy.attack_priority[index]
+
+            if preferred_type in eligible_types:
+                if self.enemy_type == preferred_type:
+                    return True
+                else:
+                    return False
+
+        return False
