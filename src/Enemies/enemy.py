@@ -6,9 +6,6 @@ import math
 
 class Enemy:
 
-    attack_priority = ("basic", "heavy", "fast")
-    attack_priority_index = 0
-
     def __init__(self, e_type, x, y, z=0, boss=False):
         #position
         self.x = x
@@ -31,6 +28,7 @@ class Enemy:
                 "position_style": "balanced",
                 "reposition_distance": 150,
                 "reposition_delay": 0.5,
+                "break_threshold": 4,
                 "attacks":{
                     "basic punch": {
                         "windup": 0.4,
@@ -72,6 +70,7 @@ class Enemy:
                 "position_style": "front",
                 "reposition_distance": 250,
                 "reposition_delay": 1.0,
+                "break_threshold": 6,
                 "attacks":{
                     "basic punch": {
                         "windup": 0.6,
@@ -113,6 +112,7 @@ class Enemy:
                 "position_style": "flank",
                 "reposition_distance": 100,
                 "reposition_delay": 0.25,
+                "break_threshold": 3,
                 "attacks":{
                     "basic punch": {
                         "windup": 0.2,
@@ -157,6 +157,7 @@ class Enemy:
                 "position_style": "front",
                 "reposition_distance": 250,
                 "reposition_delay": 1.0,
+                "break_threshold": 8,
                 "attacks":{
                     "basic punch": {
                         "windup": 0.4,
@@ -228,6 +229,22 @@ class Enemy:
         self.lunge_speed = 0
         self.lunge_dist = 0
 
+        #Hit reactions
+        self.consecutive_hits = 0
+        self.hit_reset_timer = 0.0
+        self.hit_reset_delay = 1.0
+
+        #stuns and enemy breaking
+        self.hit_stun_timer = 0.0
+        self.is_broken = False
+        self.flinch_x_velocity = 0
+
+        self.bounce_x_velocity = 0
+        self.bounce_z_velocity = 0
+
+        self.break_threshold = self.enemy_data["break_threshold"]
+        
+
         #attack dimensions
         self.atk_w = 0
         self.atk_h = 0
@@ -248,7 +265,6 @@ class Enemy:
         self.position_style = self.enemy_data["position_style"]
         self.reposition_distance = self.enemy_data["reposition_distance"]
         self.reposition_delay = self.enemy_data["reposition_delay"]
-        self.enemy_type = e_type
 
 
     def get_screen_coords(self):
@@ -264,6 +280,15 @@ class Enemy:
         side = self.attack_range * self.direction
         pygame.draw.line(screen, (250, 50, 0), (self.x + self.width / 2, self.y - self.z - (self.height * 3) /4), (self.x + self.width / 2 + side, self.y - self.z - (self.height * 3) /4), 4)
 
+        if self.attack_phase == "windup":
+            indicator_color = (255, 200, 0)
+
+            pygame.draw.circle(
+                screen,
+                indicator_color,
+                (int(self.x + self.width / 2), int(self.y - self.z - self.height - 15)),
+                8
+            )
 
     @property
     def depth_sort(self):
@@ -302,16 +327,50 @@ class Enemy:
         if self.invuln_t > 0:
             self.invuln_t = max(0, self.invuln_t - dt)
 
+        if self.hit_reset_timer > 0:
+            self.hit_reset_timer = max(0, self.hit_reset_timer - dt)
+
+            if self.hit_reset_timer == 0:
+                self.consecutive_hits = 0
+
         if self.attack_cooldown > 0:
             self.attack_cooldown = max(0, self.attack_cooldown - dt)
 
         self.detect_player(player)
         self.detect_slope(slopes)
+
+        if self.is_broken:
+            self.update_break_reaction(dt, walls, player, enemies)
+            return
+
+        if self.hit_stun_timer > 0:
+            displacement = self.wall_restricted_x(self.flinch_x_velocity * dt, walls, player, enemies, True)
+
+            if displacement == 0:
+                self.flinch_x_velocity = 0
+
+            # Gradually slow down the knockback
+            self.flinch_x_velocity *= max(0, 1 - 3 * dt)
+
+            self.hit_stun_timer = max(0, self.hit_stun_timer - dt)
+
+            if self.hit_stun_timer == 0:
+                self.flinch_x_velocity = 0
+                self.position_timer = 0.1
+
+                if self.player_detected:
+                    self.state = "chasing"
+                else:
+                    self.state = "idle"
+
+            return
+
+
         self.follow_slope()
         self.slide_on_slope(dt)
 
         if self.x_velocity != 0:
-            displacement = self.wall_restricted_x(self.x_velocity * dt, walls, player, enemies)
+            displacement = self.wall_restricted_x(self.x_velocity * dt, walls, player, enemies, True)
 
             if displacement == 0:
                 self.x_velocity = 0
@@ -321,6 +380,14 @@ class Enemy:
 
         else:
             self.combat_checks(player, dt, walls, enemies)
+
+        if self.flinch_x_velocity != 0:
+            displacement = self.wall_restricted_x(self.flinch_x_velocity * dt, walls, player, enemies, True)
+
+            if displacement == 0:
+                self.flinch_x_velocity = 0
+
+            self.flinch_x_velocity *= max(0, 1 - 5 * dt)
             
 
 
@@ -344,7 +411,7 @@ class Enemy:
                     self.has_position = False
 
             if not self.has_position:
-                self.choose_position(player, enemies)
+                self.choose_position(player, enemies, walls)
 
                 if self.has_position:
                     self.state = "repositioning"
@@ -358,16 +425,23 @@ class Enemy:
                 if dx <= 5 and dy <= 5:
                     self.state = "chasing"
 
-            elif self.in_attack_range(player) and self.attack_cooldown <= 0 and self.can_attack(enemies, player):
+            elif self.in_attack_range(player) and self.attack_cooldown <= 0 and self.can_attack(enemies):
                 if self.state != "attacking":
                     self.state = "attacking"
-                    Enemy.attack_priority_index = (Enemy.attack_priority.index(self.enemy_type) + 1) % len(Enemy.attack_priority)
                     self.attack_phase = "windup"
                     self.attack_timer = 0
                     self.attack_target_y = player.y - player.depth / 2
         
                     #choose an attack
-                    self.current_attack = random.choice(list(self.attacks.keys()))
+                    if self.position_style == "balanced":
+                        self.current_attack = random.choices(list(self.attacks.keys()), weights=[1, 1])[0]
+                    
+                    elif self.position_style == "front":
+                        self.current_attack = random.choices(list(self.attacks.keys()), weights=[1, 3])[0]
+                    
+                    elif self.position_style == "flank":
+                        self.current_attack = random.choices(list(self.attacks.keys()), weights=[4, 1])[0]
+                    
                     atk_data = self.attacks[self.current_attack]
         
                     #assign data
@@ -511,10 +585,10 @@ class Enemy:
                 self.attack_timer = 0
                 self.attack_cooldown = self.attack_cooldown_duration
                 
-                #if self.has_position:
-                    #self.state = "repositioning"
-                #else:
-                self.state = "chasing"
+                if self.has_position:
+                    self.state = "repositioning"
+                else:
+                    self.state = "chasing"
 
 
     def get_attack_hitbox(self):
@@ -556,7 +630,7 @@ class Enemy:
             pygame.draw.rect(screen, (255, 0, 0), (screen_x, screen_y, w, h), 2)
 
 
-    def wall_restricted_x(self, movement, walls, player, enemies):
+    def wall_restricted_x(self, movement, walls, player, enemies, ignore_player=False):
         previous_x = self.x
         self.x += movement
 
@@ -565,7 +639,7 @@ class Enemy:
                 self.x = previous_x
                 break
 
-        if self.check_body_collision(player):
+        if not ignore_player and self.check_body_collision(player):
             self.x = previous_x
 
         for enemy in enemies:
@@ -665,7 +739,7 @@ class Enemy:
         self.x_velocity = max(-self.max_x_vel, min(self.max_x_vel, self.x_velocity))
 
 
-    def choose_position(self, player, enemies):
+    def choose_position(self, player, enemies, walls):
         self.has_position = False
         if self.position_style == "balanced":
             positions = [(-100, 0), (100, 0), (-70, -70), (70, -70), (-70, 70), (70, 70)]
@@ -676,9 +750,25 @@ class Enemy:
         elif self.position_style == "flank":
             positions = [(-70, -70), (70, -70), (-70, 70), (70, 70), (-100, 0), (100, 0)]
 
+        best_position = None
+        best_distance = float("inf")
+
         for offset_x, offset_y in positions:
             target_x = player.x + offset_x
             target_y = player.y + offset_y
+
+            blocked = False
+
+            for wall in walls:
+                if (target_x < wall.x + wall.width and target_x + self.width > wall.x and target_y > wall.y - wall.depth and target_y - self.depth < wall.y and self.z < wall.z + wall.height and self.z + self.height > wall.z):
+                    blocked = True
+                    break
+
+                if blocked:
+                    continue
+
+                if (target_x < player.x + player.width and target_x + self.width > player.x and target_y > player.y - player.depth and target_y - self.depth < player.y and self.z < player.z + player.z + player.height and self.z + self.height > player.z):
+                    continue
 
             occupied = False
 
@@ -692,11 +782,19 @@ class Enemy:
                         break
 
             if not occupied:
-                self.target_x = target_x
-                self.target_y = target_y
-                self.has_position = True
-                self.position_timer = 0.0
-                return
+                dx = target_x - self.x
+                dy = target_y - self.y
+
+                distance = math.sqrt(dx ** 2 + dy ** 2)
+
+                if distance < best_distance:
+                    best_distance = distance
+                    best_position = (target_x, target_y)
+
+        if best_position is not None:
+            self.target_x, self.target_y = best_position
+            self.has_position = True
+            self.position_timer = 0.0
 
 
     def move_to_position(self, dt, walls, player, enemies):
@@ -737,30 +835,70 @@ class Enemy:
             pygame.draw.line(screen, (255, 255, 0), (int(self.x + self.width / 2), int(self.y - self.z - self.height / 2)),(int(screen_x), int(screen_y)), 1)
 
 
-    def can_attack(self, enemies, player):
+    def can_attack(self, enemies):
         attackers = 0
-        eligible_types = set()
 
         for enemy in enemies:
             if enemy is not self and enemy.alive:
                 if enemy.state == "attacking":
                     attackers += 1
 
-            if (enemy.alive and enemy.player_detected and enemy.state not in ("attacking", "repositioning") and enemy.attack_cooldown <= 0 and enemy.in_attack_range(player)):
-                eligible_types.add(enemy.enemy_type)
-
         if attackers >= 3:
             return False
 
-        for offset in range(len(Enemy.attack_priority)):
-            index = (Enemy.attack_priority_index + offset) % len(Enemy.attack_priority)
+        return True
 
-            preferred_type = Enemy.attack_priority[index]
 
-            if preferred_type in eligible_types:
-                if self.enemy_type == preferred_type:
-                    return True
-                else:
-                    return False
+    def receive_hit(self, attack_direction):
+        if self.is_broken:
+            return
 
-        return False
+        self.consecutive_hits += 1
+        self.hit_reset_timer = self.hit_reset_delay
+
+        self.attack_phase = ""
+        self.attack_timer = 0
+
+        if self.consecutive_hits >= self.break_threshold:
+            self.is_broken = True
+            self.state = "broken"
+
+            self.bounce_x_velocity = attack_direction * 350
+            self.bounce_z_velocity = 400
+
+        else:
+            self.state = "flinching"
+            self.hit_stun_timer = 0.15
+            self.flinch_x_velocity = attack_direction * 100
+
+
+    def update_break_reaction(self, dt, walls, player, enemies):
+
+        displacement = self.wall_restricted_x(self.bounce_x_velocity * dt, walls, player, enemies)
+
+        if displacement == 0:
+            self.bounce_x_velocity = 0
+
+        self.bounce_x_velocity *= max(0, 1 -3 * dt)
+
+        self.z += self.bounce_z_velocity * dt
+        self.bounce_z_velocity -= self.gravity * dt
+
+        ground_z = 0
+
+        if self.current_slope is not None:
+            ground_z = self.current_slope.get_player_surface_height(self)
+
+        if self.z <= ground_z:
+            self.z = ground_z
+
+            self.bounce_x_velocity = 0
+            self.bounce_z_velocity = 0
+
+            self.is_broken = False
+            self.consecutive_hits = 0
+
+            if self.player_detected:
+                self.state = "chasing"
+            else:
+                self.state = "idle"

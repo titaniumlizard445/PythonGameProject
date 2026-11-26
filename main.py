@@ -101,6 +101,8 @@ while running:
                 enemy.been_hit = True
                 enemy.health -= 25
                 enemy.invuln_t = enemy.invuln_dur
+
+                enemy.receive_hit(player.attack_direction)
     
     for enemy in enemies:
         if enemy.alive:
