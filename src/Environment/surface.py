@@ -24,18 +24,18 @@ class Surface:
         return ((self.x, self.y, self.z + self.h), (self.x + self.w, self.y, self.z + self.h), (self.x + self.w, self.y, self.z), (self.x, self.y, self.z))
 
 
-    def get_scrn_corners(self):
+    def get_scrn_corners(self, camera_x=0):
         corners = self.get_corners()
         scrn_corners = []
 
         for corner in corners:
-            scrn_corners.append((corner[0],corner[1] - corner[2]))
+            scrn_corners.append((corner[0] - camera_x, corner[1] - corner[2]))
 
         return scrn_corners
 
 
-    def get_scrn_bounds(self):
-        corners = self.get_scrn_corners()
+    def get_scrn_bounds(self, camera_x=0):
+        corners = self.get_scrn_corners(camera_x)
         x_vals = []
         y_vals = []
 
@@ -46,7 +46,7 @@ class Surface:
         return ((min(x_vals), max(x_vals)), (min(y_vals), max(y_vals)))
 
 
-    def draw(self, screen):
-        corners = self.get_scrn_corners()
+    def draw(self, screen, camera_x=0):
+        corners = self.get_scrn_corners(camera_x)
 
         pygame.draw.polygon(screen, self.color, corners, 0)

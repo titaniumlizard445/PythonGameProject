@@ -17,9 +17,9 @@ class Wall:
         self.color = (120, 10, 20)
 
 
-    def draw_front(self, screen):
+    def draw_front(self, screen, camera_x=0):
         vertical_pos = self.y - self.z - self.height
-        pygame.draw.rect(screen, self.color, (self.x, vertical_pos, self.width, self.height))
+        pygame.draw.rect(screen, self.color, (self.x - camera_x, vertical_pos, self.width, self.height))
         
 
     def get_front_surface(self):

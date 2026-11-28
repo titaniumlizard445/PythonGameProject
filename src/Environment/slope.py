@@ -45,10 +45,10 @@ class Slope:
         return self.get_height_at(player_mid_x)
 
 
-    def draw(self, screen):
-        dep_points = ((self.x, self.y - self.z), (self.x + self.w, self.y - (self.z + self.h * self.direction)),  (self.x + self.w, self.y - self.d - (self.z + self.h * self.direction)), (self.x, self.y - self.d - self.z))
+    def draw(self, screen, camera_x=0):
+        dep_points = ((self.x - camera_x, self.y - self.z), (self.x + self.w - camera_x, self.y - (self.z + self.h * self.direction)),  (self.x + self.w - camera_x, self.y - self.d - (self.z + self.h * self.direction)), (self.x - camera_x, self.y - self.d - self.z))
         bottom_z = 0
-        front_points = ((self.x, self.y - self.z), (self.x + self.w, self.y - (self.z + self.h * self.direction)), (self.x + self.w, self.y - bottom_z), (self.x, self.y - bottom_z))
+        front_points = ((self.x - camera_x, self.y - self.z), (self.x + self.w - camera_x, self.y - (self.z + self.h * self.direction)), (self.x + self.w -camera_x, self.y - bottom_z), (self.x - camera_x, self.y - bottom_z))
         pygame.draw.polygon(screen, (100, 15, 100), dep_points, 0)
         pygame.draw.polygon(screen, (70, 10, 70), front_points, 0)
 

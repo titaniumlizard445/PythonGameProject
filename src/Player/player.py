@@ -264,6 +264,9 @@ class Player:
 
     
     def request_jump(self):
+        if not self.alive:
+            return
+        
         if self.jumps_remaining > 0:
             self.jump()
         else:
@@ -317,7 +320,7 @@ class Player:
 
 
     def attack(self):
-        if self.attack_cooldown <= 0 and not self.currently_attacking:
+        if self.attack_cooldown <= 0 and not self.currently_attacking and self.alive:
             self.currently_attacking = True
             self.attack_cooldown = self.attack_duration
             self.attack_direction = self.direction
@@ -367,7 +370,7 @@ class Player:
             return None
 
 
-    def draw_attack(self, screen, hitbox):
+    def draw_attack(self, screen, hitbox, camera_x=0):
         drawable_hit = list(hitbox)
         drawable_hit.remove(self.jab_d)
         drawable_hit.remove(self.atk_y)
@@ -380,6 +383,8 @@ class Player:
             new_hitbox = (x, self.y - z - self.height, w, h)
         else:
             new_hitbox = (x, self.y - z - (1.75 * self.height), w, h)
+
+        new_hitbox = (new_hitbox[0] - camera_x, new_hitbox[1], new_hitbox[2], new_hitbox[3])
 
         pygame.draw.rect(screen, (120, 120, 0), new_hitbox, 2)
 
@@ -494,8 +499,16 @@ class Player:
     
     def update(self, keyboard_inputs, delta_time, platforms, walls, slopes, enemies):
         #useful for adding movement and animations
-        if self.health == 0:
+        if self.health <= 0:
+            self.health = 0
             self.alive = False
+
+        if not self.alive:
+            self.x_velocity = 0
+            self.y_velocity = 0
+            self.z_velocity = 0
+            self.currently_attacking = False
+            return
 
         self.kinematic_updates(keyboard_inputs, delta_time, platforms, walls, slopes, enemies)
         self.update_attack(delta_time)
@@ -532,8 +545,8 @@ class Player:
     #METHODS FOR RENDERING ###################################################################
 
     
-    def get_screen_coords(self):
-        screen_x = self.x 
+    def get_screen_coords(self, camera_x=0):
+        screen_x = self.x - camera_x
         screen_y = self.y - self.z - self.height
 
         return screen_x, screen_y
@@ -556,23 +569,23 @@ class Player:
         return shadow_z
 
 
-    def draw(self, screen):
-        scn_x, scn_y = self.get_screen_coords()
+    def draw(self, screen, camera_x=0):
+        scn_x, scn_y = self.get_screen_coords(camera_x)
         pygame.draw.rect(screen, self.color, (scn_x, scn_y, self.width, self.height))
 
 
-    def get_vis_bounds(self):
-        return (self.x, self.x + self.width, self.y - self.z - self.height, self.y - self.z)
+    def get_vis_bounds(self, camera_x=0):
+        return (self.x - camera_x, self.x + self.width - camera_x, self.y - self.z - self.height, self.y - self.z)
 
 
-    def get_shadow_bounds(self, platforms, slopes):
+    def get_shadow_bounds(self, platforms, slopes, camera_x=0):
         shad_z = self.get_shadow_height(platforms, slopes)
-        return (self.x, self.x + self.width, self.y - shad_z, self.y - shad_z + 10)
+        return (self.x - camera_x, self.x + self.width - camera_x, self.y - shad_z, self.y - shad_z + 10)
 
 
-    def draw_shadow(self, screen, platforms, slopes):
+    def draw_shadow(self, screen, platforms, slopes, camera_x=0):
         shad_z = self.get_shadow_height(platforms, slopes)
-        pygame.draw.ellipse(screen, (40, 40, 40), (self.x, self.y - shad_z, self.width, 10), 0)
+        pygame.draw.ellipse(screen, (40, 40, 40), (self.x - camera_x, self.y - shad_z, self.width, 10), 0)
 
 
     #METHODS FOR PLAYER STATS ###############################################################

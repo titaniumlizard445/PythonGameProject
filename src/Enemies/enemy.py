@@ -6,7 +6,7 @@ import math
 
 class Enemy:
 
-    def __init__(self, e_type, x, y, z=0, boss=False):
+    def __init__(self, e_type, x, y, behavior="normal", z=0, boss=False):
         #position
         self.x = x
         self.y = y
@@ -40,7 +40,11 @@ class Enemy:
                         "height": 40,
                         "depth": 50,
                         "lunge": 0,
-                        "lunge speed": 0
+                        "lunge speed": 0,
+                        "charge speed": 0,
+                        "weight": 2,
+                        "indicator color": (255, 200, 0),
+                        "indicator size": 8
                     },
                     "heavy punch": {
                         "windup": 0.7,
@@ -52,7 +56,27 @@ class Enemy:
                         "height": 65,
                         "depth": 65,
                         "lunge": 45,
-                        "lunge speed": 180
+                        "lunge speed": 180,
+                        "charge speed": 0,
+                        "weight": 2,
+                        "indicator color": (255, 120, 0),
+                        "indicator size": 14
+                    },
+                    "charge":{
+                        "windup": 0.8,
+                        "active": 0.6,
+                        "recovery": 1.0,
+                        "cooldown": 2.0,
+                        "damage": 30,
+                        "width": 0,
+                        "height": 80,
+                        "depth": 50,
+                        "lunge": 0,
+                        "lunge speed": 0,
+                        "charge speed": 250,
+                        "weight": 1,
+                        "indicator color": (255, 40, 40),
+                        "indicator size": 16
                     }
                 }
             },
@@ -82,7 +106,11 @@ class Enemy:
                         "height": 50,
                         "depth": 55,
                         "lunge": 0,
-                        "lunge speed": 0
+                        "lunge speed": 0,
+                        "charge speed": 0,
+                        "weight": 1,
+                        "indicator color": (255, 200, 0),
+                        "indicator size": 8
                     },
                     "heavy punch": {
                         "windup": 0.9,
@@ -94,7 +122,11 @@ class Enemy:
                         "height": 65,
                         "depth": 65,
                         "lunge": 65,
-                        "lunge speed": 130
+                        "lunge speed": 130,
+                        "charge speed": 0,
+                        "weight": 3,
+                        "indicator color": (255, 120, 0),
+                        "indicator size": 14
                     }
                 }
             },
@@ -124,7 +156,11 @@ class Enemy:
                         "height": 35,
                         "depth": 40,
                         "lunge": 0,
-                        "lunge speed": 0
+                        "lunge speed": 0,
+                        "charge speed": 0,
+                        "weight": 4,
+                        "indicator color": (255, 200, 0),
+                        "indicator size": 8
                     },
                     "heavy punch": {
                         "windup": 0.7,
@@ -136,7 +172,11 @@ class Enemy:
                         "height": 65,
                         "depth": 65,
                         "lunge": 85,
-                        "lunge speed": 275
+                        "lunge speed": 275,
+                        "charge speed": 0,
+                        "weight": 1,
+                        "indicator color": (255, 120, 0),
+                        "indicator size": 14
                     }
                 }
             }
@@ -169,7 +209,10 @@ class Enemy:
                         "height": 40,
                         "depth": 50,
                         "lunge": 0,
-                        "lunge speed": 0
+                        "lunge speed": 0,
+                        "weight": 1,
+                        "indicator color": (255, 250, 0),
+                        "indicator size": 8
                     },
                     "heavy punch": {
                         "windup": 0.7,
@@ -181,10 +224,13 @@ class Enemy:
                         "height": 65,
                         "depth": 65,
                         "lunge": 45,
-                        "lunge speed": 180
+                        "lunge speed": 180,
+                        "weight": 1,
+                        "indicator color": (255, 120, 0),
+                        "indicator size": 14
                     }
                 }
-            }            
+            }
         }
 
         if not boss:
@@ -228,6 +274,8 @@ class Enemy:
         self.lunge = 0
         self.lunge_speed = 0
         self.lunge_dist = 0
+        self.charge_speed = 0
+        self.charge_hit_player = False
 
         #Hit reactions
         self.consecutive_hits = 0
@@ -255,6 +303,7 @@ class Enemy:
         self.player_detected = False
         self.state = "idle"
         self.current_attack = "placeholder"
+        self.pending_attack = None
         self.attack_phase = ""
         self.attack_timer = 0.0
         self.attack_target_y = 0
@@ -265,31 +314,36 @@ class Enemy:
         self.position_style = self.enemy_data["position_style"]
         self.reposition_distance = self.enemy_data["reposition_distance"]
         self.reposition_delay = self.enemy_data["reposition_delay"]
+        self.player_was_attacking = False
+        self.opening_timer = 0
+        self.behavior = behavior
+        self.opportunist_commiting = False
+        self.wander_chance = 0.02
+        self.wander_cooldown = 0
+        self.wander_target_x = None
+        self.wander_target_y = None
+        self.wander_timer = 0
 
 
-    def get_screen_coords(self):
-        screen_x = self.x 
+    def get_screen_coords(self, camera_x=0):
+        screen_x = self.x - camera_x
         screen_y = self.y - self.z - self.height
     
         return screen_x, screen_y
 
 
-    def draw(self, screen):
-        scn_x, scn_y = self.get_screen_coords()
+    def draw(self, screen, camera_x=0):
+        scn_x, scn_y = self.get_screen_coords(camera_x)
         pygame.draw.rect(screen, self.color, (scn_x, scn_y, self.width, self.height))
         side = self.attack_range * self.direction
-        pygame.draw.line(screen, (250, 50, 0), (self.x + self.width / 2, self.y - self.z - (self.height * 3) /4), (self.x + self.width / 2 + side, self.y - self.z - (self.height * 3) /4), 4)
+        pygame.draw.line(screen, (250, 50, 0), (self.x + self.width / 2 - camera_x, self.y - self.z - (self.height * 3) /4), (self.x + self.width / 2 + side - camera_x, self.y - self.z - (self.height * 3) /4), 4)
 
+        #attack indicator
         if self.attack_phase == "windup":
-            indicator_color = (255, 200, 0)
-
-            pygame.draw.circle(
-                screen,
-                indicator_color,
-                (int(self.x + self.width / 2), int(self.y - self.z - self.height - 15)),
-                8
-            )
-
+            indicator_color = self.enemy_data["attacks"][self.current_attack]["indicator color"]
+            indicator_size = self.enemy_data["attacks"][self.current_attack]["indicator size"]     
+            pygame.draw.circle(screen, indicator_color, (int(self.x + self.width / 2 - camera_x), int(self.y - self.z - self.height - 15)), indicator_size)
+                
     @property
     def depth_sort(self):
         return self.y - self.depth / 2
@@ -315,7 +369,7 @@ class Enemy:
         return False
 
 
-    def update(self, dt, player, walls, enemies, slopes):
+    def update(self, dt, player, walls, enemies, slopes, cba):
         if self.health <= 0:
             self.health = 0
             self.alive = False
@@ -323,6 +377,20 @@ class Enemy:
 
         if not self.alive:
             return
+
+        if self.wander_cooldown > 0:
+            self.wander_cooldown = max(0, self.wander_cooldown - dt)
+        
+        if self.player_was_attacking and not player.currently_attacking:
+            self.opening_timer = 0.5
+
+            if self.behavior == "opportunist":
+                self.opportunist_commiting = True
+
+        self.player_was_attacking = player.currently_attacking
+
+        if self.opening_timer > 0:
+            self.opening_timer = max(0, self.opening_timer - dt)
 
         if self.invuln_t > 0:
             self.invuln_t = max(0, self.invuln_t - dt)
@@ -378,8 +446,11 @@ class Enemy:
         if self.state == "attacking":
             self.update_attack(dt, walls, player, enemies)
 
+        elif self.state == "wandering":
+            self.update_wandering(dt, walls, player, enemies, cba)
+
         else:
-            self.combat_checks(player, dt, walls, enemies)
+            self.combat_checks(player, dt, walls, enemies, cba)
 
         if self.flinch_x_velocity != 0:
             displacement = self.wall_restricted_x(self.flinch_x_velocity * dt, walls, player, enemies, True)
@@ -391,7 +462,7 @@ class Enemy:
             
 
 
-    def combat_checks(self, player, dt, walls, enemies):
+    def combat_checks(self, player, dt, walls, enemies, cba):
         player_center = player.x + player.width / 2
         enemy_center = self.x + self.width / 2
 
@@ -401,20 +472,34 @@ class Enemy:
             self.direction = -1
 
         if self.player_detected:
-            if self.has_position:
-                self.position_timer += dt
+            if self.wander_cooldown <= 0:
+                if random.random() < self.wander_chance * dt:
+                    self.start_wandering(cba)
+                    return
 
-                dx = abs(player.x - self.target_x)
-                dy = abs(player.y - self.target_y)
+            if self.opportunist_commiting:
+                self.has_position = False
+                self.state = "chasing"
 
-                if (dx > self.reposition_distance or dy > self.reposition_distance) and self.position_timer >= self.reposition_delay:
-                    self.has_position = False
+                if not self.in_attack_range(player):
+                    self.pursue(player, dt, walls, enemies)
+                    return
 
-            if not self.has_position:
-                self.choose_position(player, enemies, walls)
-
+            else:
                 if self.has_position:
-                    self.state = "repositioning"
+                    self.position_timer += dt
+
+                    dx = abs(player.x - self.target_x)
+                    dy = abs(player.y - self.target_y)
+
+                    if (dx > self.reposition_distance or dy > self.reposition_distance) and self.position_timer >= self.reposition_delay:
+                        self.has_position = False
+
+                if not self.has_position:
+                    self.choose_position(player, enemies, walls)
+
+                    if self.has_position:
+                        self.state = "repositioning"
 
             if self.state == "repositioning":
                 self.move_to_position(dt, walls, player, enemies)
@@ -428,20 +513,37 @@ class Enemy:
             elif self.in_attack_range(player) and self.attack_cooldown <= 0 and self.can_attack(enemies):
                 if self.state != "attacking":
                     self.state = "attacking"
+
+                    if self.behavior == "opportunist":
+                        self.opportunist_commiting = False
+                    
                     self.attack_phase = "windup"
                     self.attack_timer = 0
                     self.attack_target_y = player.y - player.depth / 2
-        
-                    #choose an attack
-                    if self.position_style == "balanced":
-                        self.current_attack = random.choices(list(self.attacks.keys()), weights=[1, 1])[0]
-                    
-                    elif self.position_style == "front":
-                        self.current_attack = random.choices(list(self.attacks.keys()), weights=[1, 3])[0]
-                    
-                    elif self.position_style == "flank":
-                        self.current_attack = random.choices(list(self.attacks.keys()), weights=[4, 1])[0]
-                    
+
+                    if self.pending_attack is None:
+                        #choose an attack
+                        attacks = list(self.attacks.keys())
+                        weights = []
+
+                        for attack in attacks:
+                            weights.append(self.attacks[attack]["weight"])
+
+                        self.pending_attack = random.choices(attacks, weights=weights)[0]
+
+                    self.current_attack = self.pending_attack
+
+                    if self.current_attack == "charge":
+                        enemy_y = self.y - self.depth / 2
+                        player_y = player.y - player.depth / 2
+
+                        if abs(enemy_y - player_y) > 15:
+                            self.target_y = player_y + self.depth / 2
+                            self.target_x = self.x
+                            self.has_position = True
+                            self.state = "repositioning"
+                            return
+
                     atk_data = self.attacks[self.current_attack]
         
                     #assign data
@@ -452,6 +554,8 @@ class Enemy:
                     self.windup_duration = atk_data["windup"]
                     self.active_duration = atk_data["active"]
                     self.recovery_duration = atk_data["recovery"]
+                    self.charge_speed = atk_data.get("charge speed", 0)
+                    self.charge_hit_player = False
         
                     self.atk_w = atk_data["width"]
                     self.atk_h = atk_data["height"]
@@ -538,7 +642,6 @@ class Enemy:
             self.wall_restricted_y(move_y, walls, player, enemies)
             
 
-
     def in_attack_range(self, player):
         e_cntr_x = self.x + self.width / 2
         e_cntr_y = self.y - self.depth / 2
@@ -575,6 +678,27 @@ class Enemy:
                 self.attack_timer = 0
 
         elif self.attack_phase == "active":
+            if self.current_attack == "charge" and not self.charge_hit_player:
+                movement = self.charge_speed * dt * self.attack_direction
+
+                # Check whether the next movement would hit the player
+                self.x += movement
+                hit_player = self.check_body_collision(player)
+                self.x -= movement
+
+                if hit_player:
+                    if player.invuln_t <= 0:
+                        player.take_damage(self.attack_damage)
+
+                    self.charge_hit_player = True
+                    self.attack_timer = self.active_duration
+
+                else:
+                    displacement = self.wall_restricted_x(movement, walls, player, enemies)
+
+                    if displacement == 0:
+                        self.attack_timer = self.active_duration
+
             if self.attack_timer >= self.active_duration:
                 self.attack_phase = "recovery"
                 self.attack_timer = 0
@@ -584,6 +708,8 @@ class Enemy:
                 self.attack_phase = ""
                 self.attack_timer = 0
                 self.attack_cooldown = self.attack_cooldown_duration
+                self.current_attack = "placeholder"
+                self.pending_attack = None
                 
                 if self.has_position:
                     self.state = "repositioning"
@@ -592,7 +718,11 @@ class Enemy:
 
 
     def get_attack_hitbox(self):
+        if self.current_attack == "charge":
+            return None
+        
         if self.attack_phase == "active":
+
             atk_y = self.attack_target_y + (self.atk_d/2)
     
             if self.attack_direction == -1:
@@ -602,7 +732,6 @@ class Enemy:
     
             hitbox = (punch_x, atk_y, self.z, self.atk_w, self.atk_h, self.atk_d)
     
-            #hitbox = tuple (xpos, ypos, jab width, jab height, jab depth)
             return hitbox
             
         else:
@@ -610,14 +739,14 @@ class Enemy:
 
 
     #Temporary hitbox debugging tool
-    def draw_attack_hitbox(self, screen):
+    def draw_attack_hitbox(self, screen, camera_x=0):
         hitbox = self.get_attack_hitbox()
 
         if hitbox is not None:
             x, y, z, w, h, d = hitbox
 
             # Convert world coordinates to screen coordinates
-            screen_x = x
+            screen_x = x - camera_x
             screen_y = y - z - h
 
             # Draw a transparent red rectangle
@@ -742,10 +871,10 @@ class Enemy:
     def choose_position(self, player, enemies, walls):
         self.has_position = False
         if self.position_style == "balanced":
-            positions = [(-100, 0), (100, 0), (-70, -70), (70, -70), (-70, 70), (70, 70)]
+            positions = [(-150, 0), (150, 0), (-120, -70), (120, -70), (-120, 70), (120, 70)]
 
         elif self.position_style == "front":
-            positions = [(-100, 0), (100, 0), (-70, 70), (70, 70), (-70, -70), (70, -70)]
+            positions = [(-150, 0), (150, 0), (-120, 70), (120, 70), (-120, -70), (120, -70)]
 
         elif self.position_style == "flank":
             positions = [(-70, -70), (70, -70), (-70, 70), (70, 70), (-100, 0), (100, 0)]
@@ -819,9 +948,9 @@ class Enemy:
             self.wall_restricted_y(move_y, walls, player, enemies)
 
 
-    def draw_position_target(self, screen):
+    def draw_position_target(self, screen, camera_x=0):
         if self.has_position:
-            screen_x = self.target_x
+            screen_x = self.target_x - camera_x
             screen_y = self.target_y - self.z - 10
 
             pygame.draw.circle(
@@ -832,7 +961,7 @@ class Enemy:
                 2
             )
 
-            pygame.draw.line(screen, (255, 255, 0), (int(self.x + self.width / 2), int(self.y - self.z - self.height / 2)),(int(screen_x), int(screen_y)), 1)
+            pygame.draw.line(screen, (255, 255, 0), (int(self.x + self.width / 2 - camera_x), int(self.y - self.z - self.height / 2)),(int(screen_x), int(screen_y)), 1)
 
 
     def can_attack(self, enemies):
@@ -902,3 +1031,55 @@ class Enemy:
                 self.state = "chasing"
             else:
                 self.state = "idle"
+
+
+    def start_wandering(self, combat_area):
+        self.state = "wandering"
+        self.has_position = False
+
+        # Choose a random destination inside the combat area
+        self.wander_target_x = random.uniform(combat_area.left, combat_area.right - self.width)
+
+        self.wander_target_y = random.uniform(combat_area.top + self.depth, combat_area.bottom)
+
+        self.wander_timer = 6.0
+        self.wander_cooldown = 5.0
+
+
+    def update_wandering(self, dt, walls, player, enemies, combat_area):
+        self.wander_timer -= dt
+
+        dx = self.wander_target_x - self.x
+        dy = self.wander_target_y - self.y
+
+        if abs(dx) <= 5 and abs(dy) <= 5:
+            self.wander_target_x = None
+            self.wander_target_y = None
+            self.has_position = None
+            self.position_timer = 0
+            self.state = "chasing"
+            return
+
+        if self.wander_timer <= 0 or not self.player_detected:
+            self.wander_target_x = None
+            self.wander_target_y = None
+            self.has_position = False
+            self.position_timer = 0
+
+            if self.player_detected:
+                self.state = "chasing"
+            else:
+                self.state = "idle"
+            return
+
+        # Face the direction of horizontal movement
+        if dx > 0:
+            self.direction = 1
+        elif dx < 0:
+            self.direction = -1
+
+        self.target_x = self.wander_target_x
+        self.target_y = self.wander_target_y
+
+        # Move toward the destination
+        self.move_to_position(dt, walls, player, enemies)
